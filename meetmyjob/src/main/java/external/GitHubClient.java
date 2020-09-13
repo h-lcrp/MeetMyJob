@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.http.HttpEntity;
@@ -64,6 +65,25 @@ public class GitHubClient {
 
 	private List<Item> getItemList(JSONArray array) {
 		List<Item> itemList = new ArrayList<>();
+		
+		List<String> descriptionList = new ArrayList<>();
+		
+		for (int i = 0; i < array.length(); i++) {
+			// We need to extract keywords from description since GitHub API
+			// doesn't return keywords.
+			String description = getStringFieldOrEmpty(array.getJSONObject(i), "description");
+			if (description.equals("") || description.equals("\n")) {
+				descriptionList.add(getStringFieldOrEmpty(array.getJSONObject(i), "title"));
+			} else {
+				descriptionList.add(description);
+			}	
+		}
+		
+		// We need to get keywords from multiple text in one request since
+		// MonkeyLearnAPI has limitations on request per minute.
+		List<List<String>> keywords = MonkeyLearnClient
+				.extractKeywords(descriptionList.toArray(new String[descriptionList.size()]));
+		
 		for (int i = 0; i < array.length(); i++) {
 			JSONObject object = array.getJSONObject(i);
 			ItemBuilder builder = new ItemBuilder();
@@ -72,6 +92,7 @@ public class GitHubClient {
 			builder.setItemId(getStringFieldOrEmpty(object, "id"));
 			builder.setName(getStringFieldOrEmpty(object, "title"));
 			builder.setUrl(getStringFieldOrEmpty(object, "url"));
+			builder.setKeywords(new HashSet<String>(keywords.get(i)));
 			itemList.add(builder.build());
 		}
 		return itemList;
